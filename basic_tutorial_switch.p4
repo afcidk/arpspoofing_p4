@@ -25,8 +25,8 @@ control basic_tutorial_ingress(
 ){
     apply {
         /* Pipelines in Ingress */
-		if (hdr.ethernet.etherType == 0x613 || \
-			hdr.ethernet.etherType == 0x614) {
+		if (hdr.ethernet.etherType == ETHERTYPE_LP || \
+			hdr.ethernet.etherType == ETHERTYPE_LRP) {
 			lp.apply(hdr, metadata, standard_metadata);
 		}
 		else {

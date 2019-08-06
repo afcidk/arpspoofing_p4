@@ -1,5 +1,7 @@
 #ifndef __LP__
 #define __LP__
+#define ETHERTYPE_LP 0x5ff
+#define ETHERTYPE_LRP 0x600
 
 control lp (
     inout headers_t hdr,

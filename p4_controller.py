@@ -23,8 +23,8 @@ MCAST_BASE = 0x70
 ip_mac_table = {}
 mac_port_sw_table = {}
 pending_entry = {} # key: (switch,MAC), value: inPort
-installed_entry = [] # key: switch
 delayed_packetIn = {}
+installed_pair = [] # value: (src,dst)
 switch = None
 
 # And then we import
@@ -251,9 +251,9 @@ def gen_arp_reply(p4info_helper, packet, rev=False):
         packet.getlayer(ARP).psrc = request_ip
     return packet
 
-def gen_LPlike(srcMAC, dstIP, type):
+def gen_LPlike(srcMAC, dstMAC, type):
     return Ether(
-        src=srcMAC, dst=ip_mac_table[dstIP],
+        src=srcMAC, dst=dstMAC,
         type=type
     )
 
@@ -282,26 +282,38 @@ def handle_ARP_packetIn(p4info_helper, sw, packetIn):
     srcMAC = orig_pkt.getlayer(Ether).src
     dstMAC = ip_mac_table[dstIP]
     outport = mac_port_sw_table[dstMAC][0]
-    pkt = gen_LPlike(srcMAC, dstIP, type=ETHERTYPE_LP)
+    pkt = gen_LPlike(srcMAC, dstMAC, type=ETHERTYPE_LP)
 
     if mac_port_sw_table[dstMAC][1] == sw:
         print('Same edge switch, no need to send LP')
         sw.PacketOut(delayed_packetIn[(dstMAC, srcMAC)])
         del delayed_packetIn[(dstMAC,srcMAC)]
-        install_bidirection_entry(p4info_helper, sw, (srcMAC,outport), (dstMAC,inport))
+        if (srcMAC, dstMAC) not in installed_pair:
+            installed_pair.append((srcMAC,dstMAC))
+            installed_pair.append((dstMAC,srcMAC))
+            install_bidirection_entry(p4info_helper, sw, (srcMAC,outport), (dstMAC,inport))
     else:
         # record pending entry
-        pending_entry[(sw, dstMAC)] = inport
-        print("ARP mgid = {}".format(inport_t))
+        # check if (srcMAC,dstMAC) recorded before
+        if (srcMAC,dstMAC) not in installed_pair:
+            pending_entry[(sw, dstMAC)] = inport
+            print("ARP mgid = {}, inport = {}".format(inport_t, inport_t-MCAST_BASE))
 
-        packet_out = p4info_helper.buildPacketOut(
-            payload = str(pkt),
-            metadata = {
-                1: inport,
-                2: chr(inport_t/0xff)+chr(inport_t%0xff)
-            }
-        )
-        sw.PacketOut(packet_out)
+            installed_pair.append((srcMAC,dstMAC))
+            installed_pair.append((dstMAC,srcMAC))
+
+            packet_out = p4info_helper.buildPacketOut(
+                payload = str(pkt),
+                metadata = {
+                    1: inport,
+                    2: chr(inport_t/0xff)+chr(inport_t%0xff)
+                }
+            )
+            sw.PacketOut(packet_out)
+        else:
+            sw.PacketOut(delayed_packetIn[(dstMAC, srcMAC)])
+            del delayed_packetIn[(dstMAC,srcMAC)]
+
 
 # handle offer, ack
 def handle_dhcp_op2(p4info_helper, sw, packetIn):
