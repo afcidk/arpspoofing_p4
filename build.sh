@@ -7,6 +7,8 @@ make
 #       - topology.json
 #       - *.p4.json
 #       - "simple_switch_grpc"
+sudo rm -rf pcaps
+
 sudo python ../../../../utils/run_exercise.py \
     --topo topology.json \
     --switch_json basic_tutorial_switch.json \

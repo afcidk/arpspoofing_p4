@@ -286,12 +286,12 @@ def handle_ARP_packetIn(p4info_helper, sw, packetIn):
 
     if mac_port_sw_table[dstMAC][1] == sw:
         print('Same edge switch, no need to send LP')
-        sw.PacketOut(delayed_packetIn[(dstMAC, srcMAC)])
-        del delayed_packetIn[(dstMAC,srcMAC)]
         if (srcMAC, dstMAC) not in installed_pair:
             installed_pair.append((srcMAC,dstMAC))
             installed_pair.append((dstMAC,srcMAC))
             install_bidirection_entry(p4info_helper, sw, (srcMAC,outport), (dstMAC,inport))
+        sw.PacketOut(delayed_packetIn[(dstMAC, srcMAC)])
+        del delayed_packetIn[(dstMAC,srcMAC)]
     else:
         # record pending entry
         # check if (srcMAC,dstMAC) recorded before
@@ -411,6 +411,8 @@ def handle_packetIn(p4info_helper, sw):
     packetIn = sw.PacketIn()
     if packetIn.WhichOneof('update') == 'packet':
         pkt = Ether(_pkt=packetIn.packet.payload)
+        wrpcap('pcaps/packet_in.pcap', pkt, append=True)
+
         if DHCP in pkt:
             print("DHCP packetIn")
             if pkt.getlayer(BOOTP).op == 1:
@@ -506,6 +508,7 @@ if __name__ == '__main__':
             topology: topology
      """
 
+    os.system('sudo rm -rf pcap/packet_in.pcap;')
     parser = argparse.ArgumentParser(description='P4Runtime Controller')
     # Specified result which compile from P4 program
     parser.add_argument('--p4info', help='p4info proto in text format from p4c',
